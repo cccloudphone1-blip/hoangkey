@@ -1026,6 +1026,8 @@ void insertW(const Uint16& data, const bool& isCaps) {
                         if (CHR(ii) == KEY_U){
                             TypingWord[ii] = KEY_W | ((TypingWord[ii] & CAPS_MASK) ? CAPS_MASK : 0);
                             hExt = 4;
+                            _stateIndex = _index;
+                            KeyStates[_index - 1] = TypingWord[ii];
                         } else if (CHR(ii) == KEY_O) {
                             hCode = vRestore;
                             TypingWord[ii] = KEY_O | ((TypingWord[ii] & CAPS_MASK) ? CAPS_MASK : 0);
@@ -1079,6 +1081,9 @@ void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32
         _appendedStandalone = false;
         TypingWord[_index - 1] = data | (isCaps ? CAPS_MASK : 0);
         hData[0] = GET(TypingWord[_index - 1]);
+        // HoangKey: The 2nd w cancelled ư back to single w. Sync history so AutoSwitch doesn't restore "ww"
+        _stateIndex = _index;
+        KeyStates[_index - 1] = data | (isCaps ? CAPS_MASK : 0);
         return;
     }
     
@@ -1097,7 +1102,7 @@ void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32
         return;
     } else if (_index == 1) { //1 char
         // HoangKey: If user typed 'w' 3 times (w -> ư, then w -> w, then w -> www), output 'www' on screen
-                if (data == KEY_W && CHR(0) == KEY_W && _stateIndex >= 2) {
+                if (data == KEY_W && CHR(0) == KEY_W) {
             hCode = vWillProcess;
             hBPC = 0;
             hNCC = 2;
@@ -1107,6 +1112,10 @@ void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32
             hData[0] = GET(TypingWord[1]);
             hData[1] = GET(TypingWord[2]);
             _index = 3;
+            _stateIndex = 3;
+            KeyStates[0] = KEY_W | (isCaps ? CAPS_MASK : 0);
+            KeyStates[1] = KEY_W | (isCaps ? CAPS_MASK : 0);
+            KeyStates[2] = KEY_W | (isCaps ? CAPS_MASK : 0);
             return;
         }
         for (i = 0; i < _standaloneWbad.size(); i++) {
@@ -1653,6 +1662,7 @@ static bool asShouldRestoreToEnglishCore() {
     asInitLetters();
     if (_stateIndex < 2 || _stateIndex < _index) return false;
     char word[AS_KEY_LEN], raw[AS_KEY_LEN];
+    if (asRawWord(KeyStates, _stateIndex, raw) && strcmp(raw, "ww") == 0) return false;
     bool transformed;
     bool wordOk = asWordKey(word, transformed);
     //Telex dropped a key on the way ("seemed" -> "semed", "cheese" -> "chees"): with it back, an English word?
@@ -1778,6 +1788,7 @@ static bool asShouldRestoreToEnglishCore() {
     if (en != AS_MISSING && vn != AS_MISSING && en - vn >= AS_TIE_PREV && _asPrevCount >= 1 &&
         _asPrev[0].same && _asPrev[0].en != AS_MISSING && _asPrev[0].vn == AS_MISSING)
         return true;   //"video call thí" -> "this"
+    if (strcmp(raw, "ww") == 0) return false;
     if (strcmp(raw, "cow") == 0 || strcmp(raw, "cows") == 0 || strcmp(raw, "www") == 0) return true;
     return vn == AS_MISSING || (vn < AS_VN_FLOOR && en - vn >= AS_PREFER) || en - vn >= AS_VN_EXTREME;
 }
