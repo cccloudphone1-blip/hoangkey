@@ -519,8 +519,12 @@ void restoreLastTypingState() {
     }
 }
 
+static bool _asWordStartOk = true;
+
 void startNewSession() {
     _asDropN = 0;
+    _spaceCount = 0;
+    _asWordStartOk = true;
     _index = 0;
     hBPC = 0;
     hNCC = 0;
@@ -1021,6 +1025,7 @@ void insertW(const Uint16& data, const bool& isCaps) {
                         hCode = vWillProcess;
                         if (CHR(ii) == KEY_U){
                             TypingWord[ii] = KEY_W | ((TypingWord[ii] & CAPS_MASK) ? CAPS_MASK : 0);
+                            hExt = 4;
                         } else if (CHR(ii) == KEY_O) {
                             hCode = vRestore;
                             TypingWord[ii] = KEY_O | ((TypingWord[ii] & CAPS_MASK) ? CAPS_MASK : 0);
@@ -1032,10 +1037,8 @@ void insertW(const Uint16& data, const bool& isCaps) {
                         TypingWord[ii] &= ~TONEW_MASK;
                         hData[_index - 1 - ii] = TypingWord[ii];
                         isRestoredW = true;
-                        //_index++;
+                        tempDisableKey = true;
                     }
-                    
-                    tempDisableKey = true;
                 } else {
                     TypingWord[ii] |= TONEW_MASK;
                     TypingWord[ii] &= ~TONE_MASK;
@@ -1068,10 +1071,12 @@ void reverseLastStandaloneChar(const Uint32& keyCode, const bool& isCaps) {
 
 static bool _afterDigit = false;   //the word started right after a digit: a lone w is a unit (100W), not ư (D33)
 void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32& keyWillReverse) {
-    if (_index > 0 && CHR(_index - 1) == keyWillReverse && TypingWord[_index - 1] & TONEW_MASK) {   //w, [ or ] can start a word
+        if (_index > 0 && CHR(_index - 1) == keyWillReverse && TypingWord[_index - 1] & TONEW_MASK) {   //w, [ or ] can start a word
         hCode = vWillProcess;
         hBPC = 1;
         hNCC = 1;
+        hExt = 4;
+        _appendedStandalone = false;
         TypingWord[_index - 1] = data | (isCaps ? CAPS_MASK : 0);
         hData[0] = GET(TypingWord[_index - 1]);
         return;
@@ -1091,6 +1096,19 @@ void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32
         reverseLastStandaloneChar(keyWillReverse, isCaps);
         return;
     } else if (_index == 1) { //1 char
+        // HoangKey: If user typed 'w' 3 times (w -> ư, then w -> w, then w -> www), output 'www' on screen
+                if (data == KEY_W && CHR(0) == KEY_W && _stateIndex >= 2) {
+            hCode = vWillProcess;
+            hBPC = 0;
+            hNCC = 2;
+            hExt = 4;
+            TypingWord[1] = data | (isCaps ? CAPS_MASK : 0);
+            TypingWord[2] = data | (isCaps ? CAPS_MASK : 0);
+            hData[0] = GET(TypingWord[1]);
+            hData[1] = GET(TypingWord[2]);
+            _index = 3;
+            return;
+        }
         for (i = 0; i < _standaloneWbad.size(); i++) {
             if (CHR(0) == _standaloneWbad[i]) {
                 insertKey(data, isCaps);
@@ -1117,7 +1135,7 @@ void checkForStandaloneChar(const Uint16& data, const bool& isCaps, const Uint32
 
 
 void handleMainKey(const Uint16& data, const bool& isCaps) {
-    //if is Z key, remove mark
+        //if is Z key, remove mark
     if (IS_KEY_Z(data)) {
         removeMark();
         if (!isChanged) {
@@ -1293,7 +1311,7 @@ int vAutoSwitchUndoCount = 0;
 
 static char _asLetter[256];
 static bool _asLetterReady = false;
-static bool _asWordStartOk = true;   //the current word began after a space, Enter, Tab or a fresh start (not inside foo.bar or my_var)
+//the current word began after a space, Enter, Tab or a fresh start (not inside foo.bar or my_var)
 
 /* Look-back: when a word confidently switches the language, the 1-2 words typed just before it
  * (separated by single spaces) are fixed too if they were ambiguous, e.g. "thí make" -> "this make".
@@ -1641,7 +1659,7 @@ static bool asShouldRestoreToEnglishCore() {
     if (_asDropN > 0 && _stateIndex >= 3 && _stateIndex + _asDropN < MAX_BUFF - 1) {   //4+ keys: "aaa" stays Telex "aa"
         Uint32 full[MAX_BUFF];
         int n = asStatesWithDrops(full, MAX_BUFF);
-            bool savedTemp = tempDisableKey;
+        bool savedTemp = tempDisableKey;
         checkSpelling(true);
         bool invalid = tempDisableKey;   //the shown word is no syllable ("chée")
         tempDisableKey = savedTemp;
@@ -1760,6 +1778,7 @@ static bool asShouldRestoreToEnglishCore() {
     if (en != AS_MISSING && vn != AS_MISSING && en - vn >= AS_TIE_PREV && _asPrevCount >= 1 &&
         _asPrev[0].same && _asPrev[0].en != AS_MISSING && _asPrev[0].vn == AS_MISSING)
         return true;   //"video call thí" -> "this"
+    if (strcmp(raw, "cow") == 0 || strcmp(raw, "cows") == 0 || strcmp(raw, "www") == 0) return true;
     return vn == AS_MISSING || (vn < AS_VN_FLOOR && en - vn >= AS_PREFER) || en - vn >= AS_VN_EXTREME;
 }
 
@@ -1851,6 +1870,9 @@ static void asRestoreToEnglish(const int& handleCode) {
 
 bool vAutoSwitchRestoreBeforeFocusLost() {
     if (!asEnabled() || _spaceCount > 0 || _stateIndex < 2 || _index <= 0) return false;
+    if (_asDoubleCount > 0 && vAutoSwitchFixDoubledKey(nullptr, 0)) {
+        return true;
+    }
     if (asShouldRestoreToEnglish()) {
         asRestoreToEnglish(vWillProcess);
         return true;
@@ -2065,7 +2087,7 @@ bool vAutoSwitchCheckEnglishWord(const Uint32* keys, const int& count,
     for (int x = 0; x < count; x++) vAutoSwitchUndoData[vAutoSwitchUndoCount++] = keys[x];
     memcpy(_asConverted, states, resultCount * sizeof(Uint32)); _asConvertedN = resultCount;   //vAutoSwitchForget picks it up when the app switches
 
-    hCode = vRestore;          //platform sends the new text, then the break key itself
+    hCode = keys ? vRestore : vWillProcess; // mouse click / focus lost (keys == nullptr) must not append previous key
     hBPC = (Byte)deleteCount;
     hNCC = (Byte)n;
     hExt = 3;
@@ -2262,7 +2284,9 @@ void vKeyHandleEvent(const vKeyEvent& event,
             hNCC = 0;
             hExt = 3; //normal key
             insertKey(data, _isCaps);
+            _asDoubleCount = 0;
         } else { //check and update key
+            _asDoubleCount = 0;
             //restore state
             hCode = vDoNothing;
             hExt = 3; //normal key
@@ -2280,15 +2304,11 @@ void vKeyHandleEvent(const vKeyEvent& event,
                         if ((KeyStates[x] & CHAR_MASK) == data) { first = x; break; }
                     char raw[AS_KEY_LEN];
                     asInitLetters();
-                    bool both = first < 0 || (asRawWord(KeyStates, _stateIndex, raw) && asEnglishScore(raw) != AS_MISSING);
-                    // HoangKey: Words like "tess", "bess", "carr" conflict with Unikey muscle memory (test, best, card)
-                    // where users double-press the tone key to cancel the accent. Keep single letter on screen.
-                    if (both && (data == KEY_R || strcmp(raw, "tess") == 0 || strcmp(raw, "bess") == 0 || strcmp(raw, "carr") == 0 ||
-                                 strcmp(raw, "starr") == 0 || strcmp(raw, "parr") == 0 || strcmp(raw, "truss") == 0 ||
-                                 strcmp(raw, "russ") == 0 || strcmp(raw, "muss") == 0 || strcmp(raw, "moss") == 0 ||
-                                 strcmp(raw, "barr") == 0 || strcmp(raw, "farr") == 0 || strcmp(raw, "marr") == 0)) {
-                        both = false;
-                    }
+                    // HoangKey: Double-pressing any tone key (s, r, f, x, j) to cancel an accent in Telex
+                    // must always keep a single consonant on screen (Unikey muscle memory: tesst -> test,
+                    // lasst -> last, carrd -> card, etc.). Words that actually have double consonants
+                    // (boss, class, coffee, err) are restored by vAutoSwitchFixDoubledKey at word end.
+                    bool both = false;
                     hBPC = _index;
                     hNCC = 0;
                     for (int x = _stateIndex - 2; x >= 0; x--)
@@ -2392,7 +2412,7 @@ bool vAutoSwitchFixDoubledKey(const Uint32* keys, const int& count) {
     if (fixedCount < 1) return false;
     vAutoSwitchUndoCount = 0;   //Backspace right after puts back what was on screen
     for (int x = 0; x < shownCount; x++) vAutoSwitchUndoData[vAutoSwitchUndoCount++] = shown[x];
-    hCode = vRestore;          //platform sends the new text, then the break key itself
+    hCode = keys ? vRestore : vWillProcess; // mouse click / focus lost (keys == nullptr) must not append previous key
     hBPC = (Byte)shownCount;
     hNCC = (Byte)fixedCount;
     hExt = 3;
