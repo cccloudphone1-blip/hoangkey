@@ -2272,6 +2272,14 @@ void vKeyHandleEvent(const vKeyEvent& event,
                     char raw[AS_KEY_LEN];
                     asInitLetters();
                     bool both = first < 0 || (asRawWord(KeyStates, _stateIndex, raw) && asEnglishScore(raw) != AS_MISSING);
+                    // HoangKey: Words like "tess", "bess", "carr" conflict with Unikey muscle memory (test, best, card)
+                    // where users double-press the tone key to cancel the accent. Keep single letter on screen.
+                    if (both && (strcmp(raw, "tess") == 0 || strcmp(raw, "bess") == 0 || strcmp(raw, "carr") == 0 ||
+                                 strcmp(raw, "starr") == 0 || strcmp(raw, "parr") == 0 || strcmp(raw, "truss") == 0 ||
+                                 strcmp(raw, "russ") == 0 || strcmp(raw, "muss") == 0 || strcmp(raw, "moss") == 0 ||
+                                 strcmp(raw, "barr") == 0 || strcmp(raw, "farr") == 0 || strcmp(raw, "marr") == 0)) {
+                        both = false;
+                    }
                     hBPC = _index;
                     hNCC = 0;
                     for (int x = _stateIndex - 2; x >= 0; x--)

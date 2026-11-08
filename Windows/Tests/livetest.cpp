@@ -53,7 +53,7 @@ static std::string toUtf8(const std::wstring& w) { int n = WideCharToMultiByte(C
 int wmain(int argc, wchar_t** argv) {
     SetConsoleOutputCP(CP_UTF8);
     std::wstring casesPath = argc > 1 ? argv[1] : L"cases.tsv";
-    std::ifstream f(casesPath); if (!f) { printf("cannot open cases file\n"); return 99; }
+    std::ifstream f(casesPath.c_str()); if (!f) { printf("cannot open cases file\n"); return 99; }
     HINSTANCE inst = GetModuleHandleW(nullptr);
     WNDCLASSW wc = {}; wc.lpfnWndProc = testWndProc; wc.hInstance = inst; wc.lpszClassName = L"VikeyLiveTest"; wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1); RegisterClassW(&wc);
     HWND win = CreateWindowExW(WS_EX_TOPMOST, L"VikeyLiveTest", L"Vikey live test", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 100, 100, 600, 300, nullptr, nullptr, inst, nullptr);
@@ -80,7 +80,7 @@ int wmain(int argc, wchar_t** argv) {
         // set the start language through the registry + a hotkey-free path: the tray app re-reads InputMethod on reloadSettings;
         // the simplest robust way is to toggle with the hotkey until the tray state matches, so we read it back from the registry.
         int want = col[1] == "vi" ? 1 : 0;
-        HWND tray = FindWindowW(L"VikeyTray", nullptr);
+        HWND tray = FindWindowW(L"HoangKeyTray", nullptr);
         if (!tray) { printf("Vikey is not running\n"); return 98; }
         if (GetForegroundWindow() != win) toFront();
         SetWindowTextW(_edit, L""); SetFocus(_edit); SendMessageW(_edit, EM_SETSEL, 0, 0); Sleep(150);

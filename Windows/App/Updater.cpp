@@ -141,7 +141,7 @@ static bool download(const Release& r) {
     if (!httpGet(r.url, file)) { _lastError = L"Không tải được bản cập nhật."; return false; }
     if (r.length && file.size() != r.length) { _lastError = L"File tải về không đúng kích thước."; return false; }
     if (!verify(file, r.signature)) { _lastError = L"Chữ ký của bản cập nhật không hợp lệ."; return false; }
-    std::ofstream f(path, std::ios::binary); f.write((const char*)file.data(), file.size()); f.close();
+    std::ofstream f(path.c_str(), std::ios::binary); f.write((const char*)file.data(), file.size()); f.close();
     if (!f) { _lastError = L"Không ghi được file cập nhật."; return false; }
     rememberPending(path, r.version);
     return true;

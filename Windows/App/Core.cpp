@@ -573,9 +573,10 @@ static LRESULT CALLBACK keyboardHook(int nCode, WPARAM wParam, LPARAM lParam) {
     TLNoteKey(_keycode, _flag);
 
     updateOtherInputLanguage();   // every key: Win+Space can switch to a Japanese/Chinese IME in the same window
-    if (vLanguage == 0) {
+    if (vLanguage == 0 || _enAfterDouble) {
+        bool inAfterDouble = _enAfterDouble;
         if (vAutoSwitchByTyping && HandleEnglishKeyForAutoSwitch()) return 1;
-        return CallNextHookEx(_kbHook, nCode, wParam, lParam);
+        if (vLanguage == 0 || inAfterDouble) return CallNextHookEx(_kbHook, nCode, wParam, lParam);
     }
     if (vOtherLanguage && _otherInputLanguage) return CallNextHookEx(_kbHook, nCode, wParam, lParam);
 

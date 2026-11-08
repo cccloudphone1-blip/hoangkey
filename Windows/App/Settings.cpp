@@ -835,7 +835,7 @@ static void refreshLog() {
         }
     }
     // events, newest first
-    std::ifstream f(core::typingLogPath(), std::ios::binary); std::vector<std::string> lines; std::string l;
+    std::ifstream f(core::typingLogPath().c_str(), std::ios::binary); std::vector<std::string> lines; std::string l;
     while (std::getline(f, l)) { if (!l.empty()) lines.push_back(l); if (lines.size() > 2000) lines.erase(lines.begin(), lines.begin() + 1000); }
     ListView_DeleteAllItems(_logList);
     int n = 0;

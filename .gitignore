@@ -23,3 +23,8 @@ Windows/installer/mkinst.cmd
 Windows/Tests/livetest.out
 
 bin/
+
+*.o
+*.res
+*.exe
+Windows/Tests/my_cases.tsv
