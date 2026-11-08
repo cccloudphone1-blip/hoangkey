@@ -1849,10 +1849,19 @@ static void asRestoreToEnglish(const int& handleCode) {
     vAutoSwitchRequest = 0;
 }
 
+bool vAutoSwitchRestoreBeforeFocusLost() {
+    if (!asEnabled() || _spaceCount > 0 || _stateIndex < 2 || _index <= 0) return false;
+    if (asShouldRestoreToEnglish()) {
+        asRestoreToEnglish(vWillProcess);
+        return true;
+    }
+    return false;
+}
+
 /** Break keys that end a word for auto switch (not arrows, tab, esc, mouse or shortcuts). */
 static bool asIsSwitchBreak(const vKeyEvent& event, const Uint16& data, const Uint8& capsStatus, const bool& otherControlKey) {
     if (event != vKeyEvent::Keyboard || otherControlKey) return false;
-    return data == KEY_COMMA || data == KEY_DOT || data == KEY_SEMICOLON || data == KEY_ENTER || data == KEY_RETURN ||
+    return data == KEY_TAB || data == KEY_COMMA || data == KEY_DOT || data == KEY_SEMICOLON || data == KEY_ENTER || data == KEY_RETURN ||
            data == KEY_QUOTE ||                                 //closing quote, or an apostrophe: doesn't, we're
            (data == KEY_SLASH && capsStatus == 1) || (data == KEY_1 && capsStatus == 1) || (data == KEY_0 && capsStatus == 1) ||
            (data == KEY_9 && capsStatus == 1) ||                //"(" right after a word: web(làm (D27)
@@ -2300,6 +2309,33 @@ void vKeyHandleEvent(const vKeyEvent& event,
                 checkGrammar(-1);
             } else {
                 checkGrammar(0);
+            }
+        }
+        // Mid-typing auto-switch: if the word violates Vietnamese spelling rules,
+        // but raw typed keys form a valid English word and shown word is not Vietnamese
+        if (asEnabled() && tempDisableKey && _stateIndex >= 2 && _index > 0 && hCode == vDoNothing) {
+            asInitLetters();
+            char raw[AS_KEY_LEN], word[AS_KEY_LEN];
+            bool transformed = false;
+            bool okW = asWordKey(word, transformed);
+            bool okR = asRawWord(KeyStates, _stateIndex, raw);
+            int en = asEnglishScore(raw);
+            int vn = asVietnameseScore(word);
+            if (okW && transformed && okR) {
+                if (en != AS_MISSING && vn == AS_MISSING) {
+                    int deleteCount = _index - 1;
+                    int n = _stateIndex;
+                    for (int x = 0; x < n; x++) {
+                        TypingWord[x] = KeyStates[x];
+                        hData[n - 1 - x] = KeyStates[x];
+                    }
+                    hCode = vWillProcess;
+                    hBPC = deleteCount;
+                    hNCC = n;
+                    _index = _stateIndex;
+                    _asPrevCount = 0;
+                    vAutoSwitchRequest = 0;
+                }
             }
         }
         

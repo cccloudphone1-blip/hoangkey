@@ -600,8 +600,16 @@ static LRESULT CALLBACK mouseHook(int nCode, WPARAM wParam, LPARAM lParam) {
             if (!PtInRect(&r, p)) PostMessageW(vEmojiWindow, WM_APP + 11, 0, 0);
         }
         _autoFixUndo.active = false; TLNoteClick();
+        if (_enAfterDouble) { _enAfterDouble = false; ResetEnglishWord(true); }
         if (vLanguage == 0) ResetEnglishWord(true);
-        else vKeyHandleEvent(vKeyEvent::Mouse, vKeyEventState::MouseDown, 0);
+        else {
+            if (vAutoSwitchByTyping && vAutoSwitchRestoreBeforeFocusLost()) {
+                int correctedCount = pData->newCharCount;
+                SendEngineOutput();
+                ApplyAutoSwitchToEnglish(correctedCount, true);
+            }
+            vKeyHandleEvent(vKeyEvent::Mouse, vKeyEventState::MouseDown, 0);
+        }
     }
     return CallNextHookEx(_mouseHook, nCode, wParam, lParam);
 }

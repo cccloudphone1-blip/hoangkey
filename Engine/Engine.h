@@ -156,6 +156,7 @@ extern int vTelexStyle;
  * the fixed word and returns true. Always forgets the pending switch.
  */
 bool vAutoSwitchFixDoubledKey(const Uint32* keys, const int& count);
+bool vAutoSwitchRestoreBeforeFocusLost();
 
 /**
  * For touch keyboards (fat-finger model): how likely each next key is after these letters of the
